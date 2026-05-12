@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import time
 from pathlib import Path
+from typing import Union
 
 import cv2
 
@@ -19,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def camera_id(value: str) -> int | str:
+def camera_id(value: str) -> Union[int, str]:
     try:
         return int(value)
     except ValueError:

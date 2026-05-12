@@ -4,6 +4,7 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Tuple, Union
 
 import cv2
 import numpy as np
@@ -20,14 +21,14 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def camera_id(value: str) -> int | str:
+def camera_id(value: str) -> Union[int, str]:
     try:
         return int(value)
     except ValueError:
         return value
 
 
-def load_calibration(path: Path) -> tuple[np.ndarray, np.ndarray]:
+def load_calibration(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     data = json.loads(path.read_text(encoding="utf-8"))
     camera = data["camera"]
     camera_matrix = np.array(camera["camera_matrix"], dtype=np.float64)

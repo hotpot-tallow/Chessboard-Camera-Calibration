@@ -1,131 +1,179 @@
-# 棋盘格摄像头标定工具
+# Chessboard Camera Calibration
 
-这个文件夹用于使用棋盘格标定摄像头内参，并导出给 AprilTag 降落识别程序使用的 `fx / fy / cx / cy` 参数。
+这个工具用于像 ROS `camera_calibration` 一样实时标定摄像头：打开摄像头后自动识别棋盘格，提示采样覆盖度，采集到足够多不同位置、大小和倾斜角度的样本后，直接计算并保存相机内参。
 
-## 目录
+标定结果里的 `fx / fy / cx / cy` 可以填入 `Lubancat0N-Apriltag/config/lubancat0n.json`，用于 AprilTag 精准降落识别。
+
+## 文件
 
 ```text
-Chessboard-Camera-Calibration/
-  capture_chessboard.py      # 采集棋盘格图片
-  calibrate_camera.py        # 根据图片计算相机内参和畸变参数
-  preview_undistort.py       # 使用标定结果实时预览去畸变效果
-  requirements.txt
-  README.md
+realtime_calibration.py   # 主程序，实时采样、实时标定、保存结果
+calibrate_camera.py       # 实时标定入口，等同于 realtime_calibration.py
+preview_undistort.py      # 用标定结果预览去畸变效果
+capture_chessboard.py     # 备用：手动采集棋盘格图片
+offline_calibrate_from_images.py  # 备用：离线图片标定
+requirements.txt
 ```
 
 ## 1. 准备棋盘格
 
-打印一张标准棋盘格，贴在平整硬板上。程序里的 `--cols` 和 `--rows` 填的是棋盘格的“内角点数量”，不是格子数量。
+程序参数里的 `--cols` 和 `--rows` 填的是棋盘格内角点数量，不是方格数量。
 
-例如常见的 9x6 内角点棋盘格：
+例如一张 10x7 个方格的棋盘格，内角点通常是：
 
-- 横向内角点：9
-- 纵向内角点：6
-- 每个小方格边长：比如 25 mm，则 `--square-size 0.025`
+```text
+--cols 9 --rows 6
+```
+
+如果每个小方格边长是 25 mm，则：
+
+```text
+--square-size 0.025
+```
+
+单位必须是米。
 
 ## 2. 安装依赖
 
-电脑上可以直接：
+电脑上可以使用：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-鲁班猫 / Ubuntu 上更推荐：
+鲁班猫 / Ubuntu 上更推荐用系统包，避免在板子上编译 OpenCV：
 
 ```bash
 sudo apt update
 sudo apt install -y python3-opencv python3-numpy
 ```
 
-## 3. 采集棋盘格图片
+## 3. 实时标定
 
-进入本目录：
+进入目录：
 
 ```bash
 cd ~/Chessboard-Camera-Calibration
 ```
 
-采集图片：
+运行实时标定，下面以 1920x1080、9x6 内角点、25 mm 方格为例：
 
 ```bash
-python capture_chessboard.py --camera 0 --width 1920 --height 1080 --output images
+python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025
 ```
 
-窗口打开后：
-
-- 按 `Space` 或 `s` 保存当前画面
-- 按 `q` 或 `Esc` 退出
-
-建议采集 20 到 40 张，棋盘格要覆盖画面中心、四角、不同距离和不同倾角。不要只在画面正中间拍。
-
-如果鲁班猫没有桌面窗口，可以用系统相机工具先拍照片，只要把图片放进 `images/` 文件夹即可。
-
-## 4. 执行标定
-
-以 9x6 内角点、25 mm 方格为例：
+也可以使用兼容入口：
 
 ```bash
-python calibrate_camera.py --images images --cols 9 --rows 6 --square-size 0.025 --output camera_calibration.json
+python3 calibrate_camera.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025
 ```
 
-参数说明：
+窗口打开后，把棋盘格移动到画面的中心、四角、不同距离和不同倾斜角度。程序会自动采样，并显示四个覆盖度：
 
-- `--cols`：横向内角点数量
-- `--rows`：纵向内角点数量
-- `--square-size`：单个棋盘格边长，单位是米
-- `--images`：棋盘格图片目录
-- `--output`：输出标定文件
+- `X`：棋盘格在画面横向位置的覆盖
+- `Y`：棋盘格在画面纵向位置的覆盖
+- `Size`：远近大小变化覆盖
+- `Skew`：倾斜透视覆盖
 
-标定完成后会输出：
+采样足够后程序会自动标定，并在窗口上显示：
 
-- `camera_calibration.json`：相机矩阵、畸变参数、重投影误差
-- `camera_calibration.npz`：NumPy 格式，方便 Python 直接读取
-- `calibration_debug/`：检测角点的调试图片
+```text
+rms / err / fx / fy / cx / cy
+```
+
+按键：
+
+```text
+Space 或 a  手动加入当前样本
+c           手动执行标定
+s           保存 camera_calibration.json 和 camera_calibration.npz
+r           清空样本重新开始
+u           切换去畸变预览
+q 或 Esc    退出
+```
+
+## 4. 常用参数
+
+最少采样数量默认是 30，可以修改：
+
+```bash
+python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025 --min-samples 40
+```
+
+如果不想自动采样，只想自己按键采样：
+
+```bash
+python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025 --manual
+```
+
+指定输出文件：
+
+```bash
+python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025 --output lubancat_camera_1080p.json
+```
 
 ## 5. 检查去畸变效果
 
-```bash
-python preview_undistort.py --camera 0 --width 1920 --height 1080 --calibration camera_calibration.json
-```
-
-窗口中会显示原始画面和去畸变画面。按 `q` 或 `Esc` 退出。
-
-## 6. 填入 AprilTag 识别配置
-
-打开标定结果：
+保存后可以单独预览去畸变效果：
 
 ```bash
-cat camera_calibration.json
+python3 preview_undistort.py --camera 0 --width 1920 --height 1080 --calibration camera_calibration.json
 ```
 
-把里面的参数填到 `Lubancat0N-Apriltag/config/lubancat0n.json`：
+## 6. 填入 AprilTag 项目
+
+打开 `camera_calibration.json`，找到：
+
+```json
+"camera": {
+  "fx": 1234.0,
+  "fy": 1234.0,
+  "cx": 960.0,
+  "cy": 540.0
+}
+```
+
+把这些值填入：
+
+```text
+Lubancat0N-Apriltag/config/lubancat0n.json
+```
+
+对应位置：
 
 ```json
 "camera": {
   "width": 1920,
   "height": 1080,
-  "fx": 标定结果里的 fx,
-  "fy": 标定结果里的 fy,
-  "cx": 标定结果里的 cx,
-  "cy": 标定结果里的 cy
+  "fx": 1234.0,
+  "fy": 1234.0,
+  "cx": 960.0,
+  "cy": 540.0
 }
 ```
 
-注意：`width / height` 必须和标定时使用的分辨率一致。如果实际运行 AprilTag 时换了分辨率，需要重新标定，或者按分辨率比例缩放内参。
+注意：标定分辨率必须和 AprilTag 运行分辨率一致。如果标定用 1920x1080，识别也要用 1920x1080。
 
-## 7. 判断标定是否可用
+## 7. 标定质量判断
 
-一般来说：
+一般经验：
 
-- 重投影误差小于 `0.5 px` 很好
+- 平均重投影误差小于 `0.5 px` 很好
 - `0.5 px` 到 `1.0 px` 通常可用
-- 大于 `1.0 px` 建议重新拍图
+- 大于 `1.0 px` 建议重新标定
 
-如果误差偏大，优先检查：
+误差偏大时，优先检查：
 
-- `--cols / --rows` 是否填的是内角点，不是格子数
-- `--square-size` 单位是否是米
-- 图片是否模糊
-- 棋盘格是否弯曲、不平整
-- 采集角度是否太单一
+- `--cols / --rows` 是否填的是内角点数量
+- 棋盘格是否平整、没有翘曲
+- 图片是否清晰、没有运动模糊
+- 样本是否覆盖中心、四角、远近和倾斜角度
+- 标定分辨率是否和实际运行分辨率一致
+
+## 8. 无桌面环境备用流程
+
+如果板子没有显示器，实时窗口打不开，可以先用其他工具拍棋盘格图片放到 `images/`，再离线标定：
+
+```bash
+python3 offline_calibrate_from_images.py --images images --cols 9 --rows 6 --square-size 0.025 --output camera_calibration.json
+```
