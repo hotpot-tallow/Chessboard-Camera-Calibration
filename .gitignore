@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+images/
+calibration_debug/
+*.npz
+camera_calibration.json
