@@ -6,10 +6,12 @@ import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+
+from camera_open import add_camera_args, open_camera
 
 
 Metrics = Tuple[float, float, float, float]
@@ -34,10 +36,7 @@ class CalibrationResult:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Realtime chessboard camera calibration.")
-    parser.add_argument("--camera", default="0", help="Camera index or device path, default: 0")
-    parser.add_argument("--width", type=int, default=1280, help="Capture width")
-    parser.add_argument("--height", type=int, default=720, help="Capture height")
-    parser.add_argument("--fps", type=int, default=30, help="Capture FPS")
+    add_camera_args(parser)
     parser.add_argument("--cols", type=int, required=True, help="Number of inner corners per row")
     parser.add_argument("--rows", type=int, required=True, help="Number of inner corners per column")
     parser.add_argument("--square-size", type=float, required=True, help="Chessboard square size in meters")
@@ -48,24 +47,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manual", action="store_true", help="Disable automatic sampling")
     parser.add_argument("--mirror", action="store_true", help="Mirror camera frames")
     return parser.parse_args()
-
-
-def camera_id(value: str) -> Union[int, str]:
-    try:
-        return int(value)
-    except ValueError:
-        return value
-
-
-def open_camera(args: argparse.Namespace) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(camera_id(args.camera))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-    cap.set(cv2.CAP_PROP_FPS, args.fps)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    if not cap.isOpened():
-        raise RuntimeError(f"failed to open camera: {args.camera}")
-    return cap
 
 
 def build_object_points(cols: int, rows: int, square_size: float) -> np.ndarray:

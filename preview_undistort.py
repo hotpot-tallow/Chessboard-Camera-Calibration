@@ -4,29 +4,20 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple
 
 import cv2
 import numpy as np
 
+from camera_open import add_camera_args, open_camera
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Preview live camera undistortion with calibration JSON.")
-    parser.add_argument("--camera", default="0", help="Camera index or device path, default: 0")
-    parser.add_argument("--width", type=int, default=1280, help="Capture width")
-    parser.add_argument("--height", type=int, default=720, help="Capture height")
-    parser.add_argument("--fps", type=int, default=30, help="Capture FPS")
+    add_camera_args(parser)
     parser.add_argument("--calibration", default="camera_calibration.json", help="Calibration JSON path")
     parser.add_argument("--alpha", type=float, default=0.0, help="Free scaling parameter, 0 crops black borders, 1 keeps all pixels")
     return parser.parse_args()
-
-
-def camera_id(value: str) -> Union[int, str]:
-    try:
-        return int(value)
-    except ValueError:
-        return value
-
 
 def load_calibration(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -40,13 +31,7 @@ def main() -> None:
     args = parse_args()
     camera_matrix, dist_coeffs = load_calibration(Path(args.calibration))
 
-    cap = cv2.VideoCapture(camera_id(args.camera))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-    cap.set(cv2.CAP_PROP_FPS, args.fps)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    if not cap.isOpened():
-        raise RuntimeError(f"failed to open camera: {args.camera}")
+    cap = open_camera(args)
 
     new_matrix, roi = cv2.getOptimalNewCameraMatrix(
         camera_matrix,

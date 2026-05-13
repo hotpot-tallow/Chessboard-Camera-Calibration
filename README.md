@@ -68,6 +68,24 @@ python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 -
 python3 calibrate_camera.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025
 ```
 
+MIPI 摄像头建议显式使用 V4L2 后端。如果 AprilTag 实际运行分辨率是 1280x720，就这样标定：
+
+```bash
+python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
+```
+
+如果 `v4l2-ctl --list-formats-ext` 里显示摄像头使用 `YUYV`，可以指定：
+
+```bash
+python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --fourcc YUYV --cols 9 --rows 6 --square-size 0.025
+```
+
+如果显示 `MJPG`，可以指定：
+
+```bash
+python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --fourcc MJPG --cols 9 --rows 6 --square-size 0.025
+```
+
 窗口打开后，把棋盘格移动到画面的中心、四角、不同距离和不同倾斜角度。程序会自动采样，并显示四个覆盖度：
 
 - `X`：棋盘格在画面横向位置的覆盖
@@ -176,4 +194,31 @@ Lubancat0N-Apriltag/config/lubancat0n.json
 
 ```bash
 python3 offline_calibrate_from_images.py --images images --cols 9 --rows 6 --square-size 0.025 --output camera_calibration.json
+```
+
+## 9. 摄像头打不开时
+
+先确认系统能取流：
+
+```bash
+v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=10
+```
+
+如果输出一串 `<`，说明 V4L2 取流成功。此时程序打不开通常是 OpenCV 后端或像素格式问题，优先试：
+
+```bash
+python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
+```
+
+查看设备和支持格式：
+
+```bash
+v4l2-ctl --list-devices
+v4l2-ctl -d /dev/video0 --list-formats-ext
+```
+
+如果真实设备不是 `/dev/video0`，例如是 `/dev/video2`，命令改成：
+
+```bash
+python3 realtime_calibration.py --backend v4l2 --camera 2 --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
 ```
