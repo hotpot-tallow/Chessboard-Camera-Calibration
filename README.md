@@ -68,7 +68,7 @@ python3 realtime_calibration.py --camera 0 --width 1920 --height 1080 --cols 9 -
 python3 calibrate_camera.py --camera 0 --width 1920 --height 1080 --cols 9 --rows 6 --square-size 0.025
 ```
 
-MIPI 摄像头建议显式使用 V4L2 后端。如果 AprilTag 实际运行分辨率是 1280x720，就这样标定：
+普通 USB 摄像头通常可以直接使用默认后端，或者显式使用 V4L2 后端。如果 AprilTag 实际运行分辨率是 1280x720，就这样标定：
 
 ```bash
 python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
@@ -84,6 +84,30 @@ python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 
 
 ```bash
 python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --fourcc MJPG --cols 9 --rows 6 --square-size 0.025
+```
+
+如果你使用的是鲁班猫上的 MIPI/RKISP 摄像头，并且 `v4l2-ctl -d /dev/video0 --list-formats-ext` 显示：
+
+```text
+Type: Video Capture Multiplanar
+```
+
+OpenCV 的 V4L2 后端可能打不开这个设备。此时要使用 GStreamer，把 RKISP/MIPI 的输出转成 OpenCV 能读的 BGR 图像。先测试系统管线是否能出图：
+
+```bash
+gst-launch-1.0 v4l2src device=/dev/video0 io-mode=4 ! video/x-raw,format=NV12,width=1280,height=720 ! videoconvert ! autovideosink
+```
+
+如果能看到画面，再用实时标定：
+
+```bash
+python3 realtime_calibration.py --backend gstreamer --camera "v4l2src device=/dev/video0 io-mode=4 ! video/x-raw,format=NV12,width=1280,height=720 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false" --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
+```
+
+如果 `NV12` 不行，可以按 `v4l2-ctl --list-formats-ext` 里列出的格式改成 `UYVY`：
+
+```bash
+python3 realtime_calibration.py --backend gstreamer --camera "v4l2src device=/dev/video0 io-mode=4 ! video/x-raw,format=UYVY,width=1280,height=720 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false" --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
 ```
 
 窗口打开后，把棋盘格移动到画面的中心、四角、不同距离和不同倾斜角度。程序会自动采样，并显示四个覆盖度：
@@ -208,6 +232,12 @@ v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=10
 
 ```bash
 python3 realtime_calibration.py --backend v4l2 --camera 0 --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
+```
+
+如果上面仍然失败，并且设备类型是 `Video Capture Multiplanar`，这是 MIPI/RKISP 摄像头常见情况，改用 GStreamer：
+
+```bash
+python3 realtime_calibration.py --backend gstreamer --camera "v4l2src device=/dev/video0 io-mode=4 ! video/x-raw,format=NV12,width=1280,height=720 ! videoconvert ! video/x-raw,format=BGR ! appsink drop=true max-buffers=1 sync=false" --width 1280 --height 720 --cols 9 --rows 6 --square-size 0.025
 ```
 
 查看设备和支持格式：
